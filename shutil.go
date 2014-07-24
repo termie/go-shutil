@@ -47,13 +47,13 @@ func IsSymlink(fi os.FileInfo) bool {
 // If followSymlinks is not set and src is a symbolic link, a
 // new symlink will be created instead of copying the file it points
 // to.
-func CopyFile(src string, dst string, followSymlinks bool) (error) {
+func CopyFile(src, dst string, followSymlinks bool) (error) {
   if samefile(src, dst) {
     return &SameFileError{src, dst}
   }
 
   // Make sure src exists and neither are special files
-  srcStat, err := os.Stat(src)
+  srcStat, err := os.Lstat(src)
   if err != nil {
     return err
   }
@@ -113,6 +113,35 @@ func CopyFile(src string, dst string, followSymlinks bool) (error) {
 }
 
 
+// Copy mode bits from src to dst.
+//
+// If followSymlinks is false, symlinks aren't followed if and only
+// if both `src` and `dst` are symlinks. If `lchmod` isn't available
+// and both are symlinks this does nothing. (I don't think lchmod is
+// available in Go)
+func CopyMode(src, dst string, followSymlinks bool) error {
+  srcStat, err := os.Lstat(src)
+  if err != nil {
+    return err
+  }
+
+  dstStat, err := os.Lstat(dst)
+  if err != nil {
+    return err
+  }
+
+  // They are both symlinks and we can't change mode on symlinks.
+  if !followSymlinks && IsSymlink(srcStat) && IsSymlink(dstStat) {
+    return nil
+  }
+
+  // Atleast one is not a symlink, get the actual file stats
+  srcStat, _ = os.Stat(src)
+  err = os.Chmod(dst, srcStat.Mode())
+  return err
+}
+
+
 // Copy data and mode bits ("cp src dst"). Return the file's destination.
 //
 // The destination may be a directory.
@@ -122,7 +151,7 @@ func CopyFile(src string, dst string, followSymlinks bool) (error) {
 //
 // If source and destination are the same file, a SameFileError will be
 // rased.
-func Copy(src string, dst string, followSymlinks bool) (string, error){
+func Copy(src, dst string, followSymlinks bool) (string, error){
   dstInfo, err := os.Stat(dst)
 
   if err == nil && dstInfo.Mode().IsDir() {
@@ -138,12 +167,10 @@ func Copy(src string, dst string, followSymlinks bool) (string, error){
     return dst, err
   }
 
-  // err = copymode(src, dst, followSymlinks)
-  // if err != nil {
-  //   return dst, err
-  // }
+  err = CopyMode(src, dst, followSymlinks)
+  if err != nil {
+    return dst, err
+  }
 
   return dst, nil
 }
-
-

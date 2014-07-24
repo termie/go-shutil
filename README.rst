@@ -1,4 +1,16 @@
-A direct port of a few of the functions from Python's shutil package for
-high-level file system operations.
+=========================================
+High-level Filesystem Operations (for Go)
+=========================================
 
-See: https://docs.python.org/3.5/library/shutil.html
+
+A direct port of a few of the functions from Python's shutil package for
+high-level filesystem operations.
+
+This project pretty much only exists so that other people don't have to keep
+re-writing this code in their projects, at this time we have been unable to
+find any helpful packages for this in the stdlib or elsewhere.
+
+We don't expect it to be perfect, just better than whatever your first draft
+would have been. Patches welcome.
+
+See also: https://docs.python.org/3.5/library/shutil.html
