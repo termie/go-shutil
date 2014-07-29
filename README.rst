@@ -14,3 +14,11 @@ We don't expect it to be perfect, just better than whatever your first draft
 would have been. Patches welcome.
 
 See also: https://docs.python.org/3.5/library/shutil.html
+
+================
+Functions So Far
+================
+
+We support Copy, CopyFile, CopyMode, and CopyTree. CopyStat would be nice if
+anybody wants to write that. Also the other functions that might be useful in
+the python library :D
