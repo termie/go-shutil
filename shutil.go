@@ -263,7 +263,6 @@ func CopyTree(src, dst string, options *CopyTreeOptions) error {
     return &AlreadyExistsError{dst}
   }
 
-
   entries, err := ioutil.ReadDir(src)
   if err != nil {
     return err
@@ -278,7 +277,6 @@ func CopyTree(src, dst string, options *CopyTreeOptions) error {
   if options.Ignore != nil {
     ignoredNames = options.Ignore(src, entries)
   }
-
 
   for _, entry := range entries {
     if stringInSlice(entry.Name(), ignoredNames) {
@@ -313,7 +311,10 @@ func CopyTree(src, dst string, options *CopyTreeOptions) error {
         }
       }
     } else if entryFileInfo.IsDir() {
-      return CopyTree(srcPath, dstPath, options)
+      err = CopyTree(srcPath, dstPath, options)
+      if err != nil {
+        return err
+      }
     } else {
       _, err = options.CopyFunction(srcPath, dstPath, false)
       if err != nil {
