@@ -3,6 +3,7 @@ package shutil
 import (
   "fmt"
   "io"
+  "io/ioutil"
   "os"
   "path/filepath"
 )
@@ -26,6 +27,23 @@ func (e SpecialFileError) Error() string {
   return fmt.Sprintf("`%s` is a named pipe", e.File)
 }
 
+type NotADirectoryError struct {
+  Src string
+}
+
+func (e NotADirectoryError) Error() string {
+  return fmt.Sprintf("`%s` is not a directory", e.Src)
+}
+
+
+type AlreadyExistsError struct {
+  Dst string
+}
+
+func (e AlreadyExistsError) Error() string {
+  return fmt.Sprintf("`%s` already exists", e.Dst)
+}
+
 
 func samefile(src string, dst string) bool {
   srcInfo, _ := os.Stat(src)
@@ -35,6 +53,15 @@ func samefile(src string, dst string) bool {
 
 func specialfile(fi os.FileInfo) bool {
   return (fi.Mode() & os.ModeNamedPipe) == os.ModeNamedPipe
+}
+
+func stringInSlice(a string, list []string) bool {
+    for _, b := range list {
+        if b == a {
+            return true
+        }
+    }
+    return false
 }
 
 func IsSymlink(fi os.FileInfo) bool {
@@ -173,4 +200,128 @@ func Copy(src, dst string, followSymlinks bool) (string, error){
   }
 
   return dst, nil
+}
+
+
+type CopyTreeOptions struct {
+  Symlinks bool
+  IgnoreDanglingSymlinks bool
+  CopyFunction func (string, string, bool) (string, error)
+  Ignore func (string, []os.FileInfo) []string
+}
+
+// Recursively copy a directory tree.
+//
+// The destination directory must not already exist.
+
+// If the optional symlinks flag is true, symbolic links in the
+// source tree result in symbolic links in the destination tree; if
+// it is false, the contents of the files pointed to by symbolic
+// links are copied. If the file pointed by the symlink doesn't
+// exist, an exception will be added in the list of errors raised in
+// an Error exception at the end of the copy process.
+//
+// You can set the optional ignoreDanglingSymlinks flag to true if you
+// want to silence this exception. Notice that this has no effect on
+// platforms that don't support os.symlink.
+//
+// The optional ignore argument is a callable. If given, it
+// is called with the `src` parameter, which is the directory
+// being visited by copytree(), and `names` which is the list of
+// `src` contents, as returned by ioutil.ReadDir():
+//
+//   callable(src, names) -> ignored_names
+//
+// Since CopyTree() is called recursively, the callable will be
+// called once for each directory that is copied. It returns a
+// list of names relative to the `src` directory that should
+// not be copied.
+//
+// The optional copyFunction argument is a callable that will be used
+// to copy each file. It will be called with the source path and the
+// destination path as arguments. By default, Copy() is used, but any
+// function that supports the same signature (like Copy()) can be used.
+
+func CopyTree(src, dst string, options *CopyTreeOptions) error {
+  if options == nil {
+    options = &CopyTreeOptions{Symlinks:false,
+                               Ignore:nil,
+                               CopyFunction:Copy,
+                               IgnoreDanglingSymlinks:false}
+  }
+
+
+  srcFileInfo, err := os.Stat(src)
+  if err != nil {
+    return err
+  }
+
+  if !srcFileInfo.IsDir() {
+    return &NotADirectoryError{src}
+  }
+
+  _, err = os.Open(dst)
+  if !os.IsNotExist(err) {
+    return &AlreadyExistsError{dst}
+  }
+
+
+  entries, err := ioutil.ReadDir(src)
+  if err != nil {
+    return err
+  }
+
+  err = os.MkdirAll(dst, srcFileInfo.Mode())
+  if err != nil {
+    return err
+  }
+
+  ignoredNames := []string{}
+  if options.Ignore != nil {
+    ignoredNames = options.Ignore(src, entries)
+  }
+
+
+  for _, entry := range entries {
+    if stringInSlice(entry.Name(), ignoredNames) {
+      continue
+    }
+    srcPath := filepath.Join(src, entry.Name())
+    dstPath := filepath.Join(dst, entry.Name())
+
+    entryFileInfo, err := os.Lstat(srcPath)
+    if err != nil {
+      return err
+    }
+
+    // Deal with symlinks
+    if IsSymlink(entryFileInfo) {
+      linkTo, err := os.Readlink(srcPath)
+      if err != nil {
+        return err
+      }
+      if options.Symlinks {
+        os.Symlink(linkTo, dstPath)
+        //CopyStat(srcPath, dstPath, false)
+      } else {
+        // ignore dangling symlink if flag is on
+        _, err = os.Stat(linkTo)
+        if os.IsNotExist(err) && options.IgnoreDanglingSymlinks {
+          continue
+        }
+        _, err = options.CopyFunction(srcPath, dstPath, false)
+        if err != nil {
+          return err
+        }
+      }
+    } else if entryFileInfo.IsDir() {
+      return CopyTree(srcPath, dstPath, options)
+    } else {
+      _, err = options.CopyFunction(srcPath, dstPath, false)
+      if err != nil {
+        return err
+      }
+    }
+  }
+  return nil
 }
