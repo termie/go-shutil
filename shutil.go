@@ -108,6 +108,9 @@ func CopyFile(src, dst string, followSymlinks bool) (error) {
     if err != nil {
       return err
     }
+    if(path.IsAbs(src) != true){ // if it's a relative symlink 
+      src = path.Dir(src)+src // prepend path of src
+    }
     srcStat, err = os.Stat(src)
     if err != nil {
       return err
