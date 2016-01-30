@@ -127,6 +127,10 @@ func CopyFile(src, dst string, followSymlinks bool) (error) {
   }
   defer fdst.Close()
 
+  if success, _ := clonefile(fdst, fsrc); success {
+    return nil
+  }
+
   size, err := io.Copy(fdst, fsrc)
   if err != nil {
     return err
