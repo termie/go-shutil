@@ -119,15 +119,45 @@ func TestCopyTree(t *testing.T) {
   // clear out existing files if they exist
   os.RemoveAll("test/testdir3")
 
-  err := CopyTree("test/testdir", "test/testdir3", nil)
+  options := &CopyTreeOptions{Symlinks:false,
+                           Ignore:nil,
+                           CopyFunction:Copy,
+                           IgnoreDanglingSymlinks:false,
+                           OnlySubDir:false}
+
+  err := CopyTree("test/testdir", "test/testdir3", options)
   if err != nil {
     t.Error(err)
     return
   }
 
-  match, err := filesMatch("test/testdir/file1", "test/testdir3/file1")
+  match, err := filesMatch("test/testdir/file1", "test/testdir3/testdir/file1")
   if err != nil {
     t.Error(err)
+    return
+  }
+  if !match {
+    t.Fail()
+    return
+  }
+
+  os.RemoveAll("test/testdir3")
+
+  options = &CopyTreeOptions{Symlinks:false,
+                           Ignore:nil,
+                           CopyFunction:Copy,
+                           IgnoreDanglingSymlinks:false,
+                           OnlySubDir:true}
+
+  err2 := CopyTree("test/testdir", "test/testdir3", options)
+  if err2 != nil {
+    t.Error(err2)
+    return
+  }
+
+  match, err3 := filesMatch("test/testdir/file1", "test/testdir3/file1")
+  if err3 != nil {
+    t.Error(err3)
     return
   }
   if !match {
