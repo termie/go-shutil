@@ -207,6 +207,7 @@ type CopyTreeOptions struct {
   IgnoreDanglingSymlinks bool
   CopyFunction func (string, string, bool) (string, error)
   Ignore func (string, []os.FileInfo) []string
+  OnlySubDir bool
 }
 
 // Recursively copy a directory tree.
@@ -245,9 +246,9 @@ func CopyTree(src, dst string, options *CopyTreeOptions) error {
     options = &CopyTreeOptions{Symlinks:false,
                                Ignore:nil,
                                CopyFunction:Copy,
-                               IgnoreDanglingSymlinks:false}
+                               IgnoreDanglingSymlinks:false,
+                               OnlySubDir:false}
   }
-
 
   srcFileInfo, err := os.Stat(src)
   if err != nil {
@@ -258,9 +259,18 @@ func CopyTree(src, dst string, options *CopyTreeOptions) error {
     return &NotADirectoryError{src}
   }
 
-  _, err = os.Open(dst)
-  if !os.IsNotExist(err) {
-    return &AlreadyExistsError{dst}
+  destFileInfo, err := os.Stat(src)
+  if err != nil {
+    return err
+  }
+
+  _, baseDirName := filepath.Split(src)
+  if !destFileInfo.IsDir() {
+    return &NotADirectoryError{src}
+  } else {
+    if !options.OnlySubDir {
+      dst = filepath.Join(dst, baseDirName)
+    }
   }
 
   entries, err := ioutil.ReadDir(src)
